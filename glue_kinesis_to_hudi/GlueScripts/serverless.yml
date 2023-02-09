@@ -1,0 +1,70 @@
+service: apache-hudi-streams
+
+useDotenv: true
+
+provider:
+  name: aws
+  region: us-east-1
+
+  stackTags:
+    product: datateam
+    env: qa
+    created-date: 2022-04-05
+    team: data
+    customer-impact: false
+    terraform: false
+
+plugins:
+  - serverless-glue
+
+Glue:
+  bucketDeploy: 'glue-learn-begineers'
+  tempDirBucket: 'glue-learn-begineers'
+  tempDirS3Prefix: 'temp/'
+  jobs:
+    - name: 'hudi-glue-script-template'
+      scriptPath: 'glue-script.py'
+      type: spark
+      glueVersion: "python3-3.0"
+      role: 'arn:aws:iam::043916019468:role/Lab3'
+      MaxConcurrentRuns: 3
+      Connections:
+        - 'hudi-connection'
+      DefaultArguments:
+        customArguments:
+          class : 'GlueApp'
+          database_name: 'real_time_streams'
+          hudi_table_name: 'hudi_streams_table'
+          kinesis_table_name : 'hudi_kinesis_clicks_stream_table'
+          s3_path_hudi : 's3://glue-learn-begineers/hudi_stuff/hudi_demo_table/'
+          s3_path_spark : 's3://glue-learn-begineers/spark_checkpoints/'
+          starting_position_of_kinesis_iterator: 'LATEST'
+          window_size : '10 seconds'
+      tempDir: true
+      WorkerType: Standard
+      NumberOfWorkers: 3
+      Timeout: 2880
+      MaxRetries: 0
+      SupportFiles:
+        - local_path: "glue-script.py"
+          s3_bucket: 'glue-learn-begineers'
+          s3_prefix: 'Scripts/'
+          execute_upload: True
+
+
+resources:
+  Resources:
+    KinesisDataStreams:
+      Type: AWS::Kinesis::Stream
+      Properties:
+        Name: 'clicksStreams'
+        RetentionPeriodHours: 24
+        StreamModeDetails:
+          StreamMode: ON_DEMAND
+
+    GlueDatabase:
+      Type: AWS::Glue::Database
+      Properties:
+        CatalogId: '043916019468'
+        DatabaseInput:
+          Name: 'real_time_streams'
